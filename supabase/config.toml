@@ -4,8 +4,3 @@ project_id = "gzstwfhhifgzhdroakaz"
 site_url = "http://localhost:8080"
 additional_redirect_urls = ["http://localhost:8080/**"]
 
-[auth.external.google]
-enabled = true
-client_id = "483091715238-difl0dk7vi1nv8sb72bl1q53qsah6n6m.apps.googleusercontent.com"
-secret = "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"
-skip_nonce_check = true
