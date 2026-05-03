@@ -134,7 +134,7 @@ function PDP() {
 
   const [qty, setQty] = useState(1);
   const [purchaseType, setPurchaseType] = useState<"once" | "subscribe">("once");
-  const [frequency, setFrequency] = useState<"2weeks" | "monthly" | "6weeks" | "bimonthly">("monthly");
+  const [frequency, setFrequency] = useState<"2weeks" | "monthly" | "6weeks" | "bimonthly" | "3months">("monthly");
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -311,6 +311,7 @@ function PDP() {
         monthly: 30,
         "6weeks": 42,
         bimonthly: 60,
+        "3months": 90,
       };
       const { error } = await supabase.from("subscriptions").insert({
         user_id: user.id,
@@ -641,6 +642,7 @@ function PDP() {
                         <option value="monthly">Every Month</option>
                         <option value="6weeks">Every 6 Weeks</option>
                         <option value="bimonthly">Every 2 Months</option>
+                        <option value="3months">Every 3 Months</option>
                       </select>
                     </label>
                   </div>

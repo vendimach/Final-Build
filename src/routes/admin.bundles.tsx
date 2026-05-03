@@ -19,10 +19,20 @@ interface BundleProduct {
   stock: number;
 }
 
+interface AvailableProduct {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface BundleItem {
+  productId: string;
+  quantity: number;
+}
+
 const EMPTY_DRAFT = {
   name: "",
   price: "",
-  description: "",
   image_url: "",
   stock: "100",
   is_active: true,
@@ -31,7 +41,9 @@ const EMPTY_DRAFT = {
 function AdminBundles() {
   const [bundles, setBundles] = useState<BundleProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [bundleItems, setBundleItems] = useState<BundleItem[]>([{ productId: "", quantity: 1 }]);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -46,10 +58,38 @@ function AdminBundles() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  async function loadAvailableProducts() {
+    const { data } = await supabase
+      .from("products")
+      .select("id, name, price")
+      .eq("is_active", true)
+      .neq("format", "bundles")
+      .order("name");
+    setAvailableProducts((data ?? []) as AvailableProduct[]);
+  }
+
+  useEffect(() => {
+    load();
+    loadAvailableProducts();
+  }, []);
+
+  function parseDescriptionToItems(description: string | null): BundleItem[] {
+    if (!description) return [{ productId: "", quantity: 1 }];
+    const lines = description.split("\n").filter(Boolean);
+    const parsed = lines.map((line) => {
+      const match = line.match(/^(\d+)[×x]\s+(.+)$/);
+      if (!match) return null;
+      const qty = parseInt(match[1], 10);
+      const name = match[2].trim();
+      const product = availableProducts.find((p) => p.name === name);
+      return product ? { productId: product.id, quantity: qty } : null;
+    }).filter((x): x is BundleItem => x !== null);
+    return parsed.length > 0 ? parsed : [{ productId: "", quantity: 1 }];
+  }
 
   function openCreate() {
     setDraft(EMPTY_DRAFT);
+    setBundleItems([{ productId: "", quantity: 1 }]);
     setEditingId(null);
     setShowForm(true);
   }
@@ -58,11 +98,11 @@ function AdminBundles() {
     setDraft({
       name: b.name,
       price: String(b.price),
-      description: b.description ?? "",
       image_url: b.image_url ?? "",
       stock: String(b.stock),
       is_active: b.is_active,
     });
+    setBundleItems(parseDescriptionToItems(b.description));
     setEditingId(b.id);
     setShowForm(true);
   }
@@ -71,24 +111,49 @@ function AdminBundles() {
     setShowForm(false);
     setEditingId(null);
     setDraft(EMPTY_DRAFT);
+    setBundleItems([{ productId: "", quantity: 1 }]);
+  }
+
+  function addBundleItemRow() {
+    setBundleItems((prev) => [...prev, { productId: "", quantity: 1 }]);
+  }
+
+  function removeBundleItemRow(index: number) {
+    setBundleItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateBundleItem(index: number, field: keyof BundleItem, value: string | number) {
+    setBundleItems((prev) => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  }
+
+  function serializeItems(): string {
+    return bundleItems
+      .filter((i) => i.productId)
+      .map((i) => {
+        const p = availableProducts.find((p) => p.id === i.productId);
+        return `${i.quantity}× ${p?.name ?? ""}`;
+      })
+      .join("\n");
   }
 
   async function save() {
     const price = Number(draft.price);
     if (!draft.name.trim()) { toast.error("Name is required"); return; }
     if (!Number.isFinite(price) || price <= 0) { toast.error("Enter a valid price"); return; }
+    const filledItems = bundleItems.filter((i) => i.productId);
+    if (filledItems.length === 0) { toast.error("Add at least one product to the bundle"); return; }
 
     setSaving(true);
     try {
+      const description = serializeItems();
       const payload = {
         name: draft.name.trim(),
         price,
-        description: draft.description.trim() || null,
+        description: description || null,
         image_url: draft.image_url.trim() || null,
         stock: Math.max(0, Number(draft.stock) || 0),
         is_active: draft.is_active,
         format: "bundles" as const,
-        // Required non-null fields with sensible defaults for bundles
         flavor: "savory" as const,
         spice_level: 0,
         sweetness_level: 0,
@@ -160,6 +225,7 @@ function AdminBundles() {
             <h3 className="font-display text-xl">{editingId ? "Edit Bundle" : "Create Bundle"}</h3>
             <button onClick={cancelForm} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="label-text">Bundle name *</span>
@@ -181,17 +247,55 @@ function AdminBundles() {
                 className="field mt-1"
               />
             </label>
-            <label className="block sm:col-span-2">
-              <span className="label-text">What's in the bundle</span>
-              <textarea
-                rows={4}
-                value={draft.description}
-                onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-                placeholder={"2× Smoky Chipotle Sticks\n2× Classic BBQ Strips\n2× Teriyaki Bites\n2× Honey Sriracha Jerky\n4× Pitmasters Select Sampler"}
-                className="field mt-1"
-              />
-              <p className="mt-1 text-[10px] text-muted-foreground">Each line is one item entry. Shown to customers on the Build-a-Box page.</p>
-            </label>
+          </div>
+
+          {/* Bundle items */}
+          <div className="mt-4">
+            <span className="label-text">Bundle contents *</span>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">Select products and quantities to include in this bundle.</p>
+            <div className="mt-2 space-y-2">
+              {bundleItems.map((item, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <select
+                    value={item.productId}
+                    onChange={(e) => updateBundleItem(index, "productId", e.target.value)}
+                    className="field flex-1"
+                  >
+                    <option value="">— Select product —</option>
+                    {availableProducts.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({formatINR(p.price)})</option>
+                    ))}
+                  </select>
+                  <select
+                    value={item.quantity}
+                    onChange={(e) => updateBundleItem(index, "quantity", parseInt(e.target.value, 10))}
+                    className="field w-20"
+                  >
+                    {[1,2,3,4,5,6,8,10,12].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeBundleItemRow(index)}
+                    disabled={bundleItems.length === 1}
+                    className="rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-destructive disabled:opacity-30"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addBundleItemRow}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+            >
+              <Plus className="h-3 w-3" /> Add another product
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="block sm:col-span-2">
               <span className="label-text">Image URL</span>
               <input
@@ -221,6 +325,7 @@ function AdminBundles() {
               <span className="text-sm font-medium">Active (visible to customers)</span>
             </label>
           </div>
+
           <div className="mt-5 flex gap-2">
             <button
               onClick={save}
@@ -247,10 +352,9 @@ function AdminBundles() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {bundles.map((b) => (
             <div key={b.id} className={`rounded-2xl border bg-card overflow-hidden ${b.is_active ? "border-border" : "border-border opacity-60"}`}>
-              {b.image_url && (
+              {b.image_url ? (
                 <img src={b.image_url} alt={b.name} className="h-40 w-full object-cover" />
-              )}
-              {!b.image_url && (
+              ) : (
                 <div className="flex h-40 w-full items-center justify-center bg-muted">
                   <BoxSelect className="h-12 w-12 text-muted-foreground" />
                 </div>
@@ -266,7 +370,14 @@ function AdminBundles() {
                   </span>
                 </div>
                 {b.description && (
-                  <pre className="mt-2 whitespace-pre-wrap font-sans text-xs text-muted-foreground line-clamp-4">{b.description}</pre>
+                  <ul className="mt-2 space-y-0.5">
+                    {b.description.split("\n").filter(Boolean).slice(0, 5).map((line, i) => (
+                      <li key={i} className="text-xs text-muted-foreground">· {line}</li>
+                    ))}
+                    {b.description.split("\n").filter(Boolean).length > 5 && (
+                      <li className="text-xs text-muted-foreground">· +{b.description.split("\n").filter(Boolean).length - 5} more</li>
+                    )}
+                  </ul>
                 )}
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => openEdit(b)} className="flex-1 rounded-xl border border-border bg-background py-1.5 text-xs font-semibold">Edit</button>
