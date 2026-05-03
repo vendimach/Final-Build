@@ -1,8 +1,10 @@
 import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import { CartDrawer } from "@/components/CartDrawer";
+import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -32,6 +34,27 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  useEffect(() => {
+    // Capture referral code from URL into localStorage
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      localStorage.setItem("pending_referral_code", ref.toUpperCase().trim());
+    }
+
+    // Process referral after Google OAuth redirect (SIGNED_IN on fresh session)
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        const code = localStorage.getItem("pending_referral_code");
+        if (code) {
+          localStorage.removeItem("pending_referral_code");
+          supabase.rpc("process_referral_signup", { p_referrer_code: code });
+        }
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   return (
     <AuthProvider>
       <CartProvider>

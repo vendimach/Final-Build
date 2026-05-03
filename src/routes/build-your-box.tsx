@@ -3,11 +3,21 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { fetchProducts, imageForSlug, type DbProduct } from "@/lib/db-products";
+import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/lib/cart-context";
-import { Check, Plus, Minus, Package, Loader2 } from "lucide-react";
+import { Check, Plus, Minus, Package, Loader2, BoxSelect } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/currency";
+
+interface PremadeBundle {
+  id: string;
+  name: string;
+  price: number;
+  description: string | null;
+  image_url: string | null;
+  stock: number;
+}
 
 export const Route = createFileRoute("/build-your-box")({
   head: () => ({
@@ -29,6 +39,7 @@ function BuildYourBox() {
   const [products, setProducts] = useState<DbProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [picks, setPicks] = useState<Record<string, number>>({});
+  const [premadeBundles, setPremadeBundles] = useState<PremadeBundle[]>([]);
   const { addItem, setOpen } = useCart();
 
   useEffect(() => {
@@ -36,6 +47,14 @@ function BuildYourBox() {
       .then((p) => setProducts(p.filter((x) => x.format !== "bundles")))
       .catch(() => toast.error("Couldn't load products"))
       .finally(() => setLoading(false));
+
+    supabase
+      .from("products")
+      .select("id, name, price, description, image_url, stock")
+      .eq("format", "bundles")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setPremadeBundles((data ?? []) as PremadeBundle[]));
   }, []);
 
   const totalPicked = Object.values(picks).reduce((s, n) => s + n, 0);
@@ -106,6 +125,77 @@ function BuildYourBox() {
             Pick your favorites. Save up to 25%. Same flat rate, your flavors.
           </p>
         </motion.div>
+
+        {/* Pre-Made Bundles */}
+        {premadeBundles.length > 0 && (
+          <section className="mt-14">
+            <div className="text-center">
+              <span className="inline-block rounded-full bg-primary/10 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+                Pre Made Bundles
+              </span>
+              <h2 className="mt-3 font-display text-3xl tracking-wide">No decisions, just deliciousness.</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Hand-Picked combos by our pitmasters</p>
+            </div>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {premadeBundles.map((bundle) => (
+                <motion.div
+                  key={bundle.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="overflow-hidden rounded-2xl border border-border bg-card"
+                >
+                  {bundle.image_url ? (
+                    <img src={bundle.image_url} alt={bundle.name} className="h-48 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-48 w-full items-center justify-center bg-muted">
+                      <BoxSelect className="h-14 w-14 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="p-5">
+                    <h3 className="font-display text-xl tracking-wide">{bundle.name}</h3>
+                    <div className="mt-1 font-display text-2xl text-primary">{formatINR(bundle.price)}</div>
+                    {bundle.description && (
+                      <ul className="mt-3 space-y-1">
+                        {bundle.description.split("\n").filter(Boolean).map((line, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            <Check className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (bundle.stock === 0) { toast.error("Out of stock"); return; }
+                        addItem({
+                          id: `bundle-premade-${bundle.id}`,
+                          productId: bundle.id,
+                          name: bundle.name,
+                          price: bundle.price,
+                          isBundle: false,
+                          subscription: null,
+                        });
+                        setOpen(true);
+                      }}
+                      disabled={bundle.stock === 0}
+                      className="btn-glow mt-5 w-full rounded-full bg-gradient-ember py-3 text-xs font-bold uppercase tracking-wider text-primary-foreground disabled:opacity-50"
+                    >
+                      {bundle.stock === 0 ? "Out of Stock" : `Add to Cart • ${formatINR(bundle.price)}`}
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            <div className="mt-10 border-t border-border" />
+            <div className="mt-8 text-center">
+              <span className="inline-block rounded-full bg-muted px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Or Build Your Own
+              </span>
+              <p className="mt-2 text-sm text-muted-foreground">Pick your favorites. Save up to 25%. Same flat rate, your flavors.</p>
+            </div>
+          </section>
+        )}
 
         {/* Box size selector */}
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">

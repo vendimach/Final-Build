@@ -28,6 +28,7 @@ import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
+import { Route as AdminBundlesRouteImport } from './routes/admin.bundles'
 
 const TrackRoute = TrackRouteImport.update({
   id: '/track',
@@ -124,6 +125,11 @@ const AdminCouponsRoute = AdminCouponsRouteImport.update({
   path: '/coupons',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBundlesRoute = AdminBundlesRouteImport.update({
+  id: '/bundles',
+  path: '/bundles',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/subscribe': typeof SubscribeRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
+  '/admin/bundles': typeof AdminBundlesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/orders': typeof AdminOrdersRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/subscribe': typeof SubscribeRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
+  '/admin/bundles': typeof AdminBundlesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/orders': typeof AdminOrdersRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/subscribe': typeof SubscribeRoute
   '/terms': typeof TermsRoute
   '/track': typeof TrackRoute
+  '/admin/bundles': typeof AdminBundlesRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/orders': typeof AdminOrdersRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/subscribe'
     | '/terms'
     | '/track'
+    | '/admin/bundles'
     | '/admin/coupons'
     | '/admin/customers'
     | '/admin/orders'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/subscribe'
     | '/terms'
     | '/track'
+    | '/admin/bundles'
     | '/admin/coupons'
     | '/admin/customers'
     | '/admin/orders'
@@ -242,6 +253,7 @@ export interface FileRouteTypes {
     | '/subscribe'
     | '/terms'
     | '/track'
+    | '/admin/bundles'
     | '/admin/coupons'
     | '/admin/customers'
     | '/admin/orders'
@@ -401,10 +413,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCouponsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/bundles': {
+      id: '/admin/bundles'
+      path: '/bundles'
+      fullPath: '/admin/bundles'
+      preLoaderRoute: typeof AdminBundlesRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminBundlesRoute: typeof AdminBundlesRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminCustomersRoute: typeof AdminCustomersRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
@@ -413,6 +433,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBundlesRoute: AdminBundlesRoute,
   AdminCouponsRoute: AdminCouponsRoute,
   AdminCustomersRoute: AdminCustomersRoute,
   AdminOrdersRoute: AdminOrdersRoute,

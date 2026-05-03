@@ -11,7 +11,7 @@ export const Route = createFileRoute("/admin/customers")({
 interface CustomerRow {
   id: string;
   display_name: string | null;
-  loyalty_points: number;
+  wallet_balance: number;
   referral_code: string;
   created_at: string;
   orderCount: number;
@@ -27,7 +27,7 @@ function AdminCustomers() {
   useEffect(() => {
     (async () => {
       const [profilesRes, ordersRes] = await Promise.all([
-        supabase.from("profiles").select("id, display_name, loyalty_points, referral_code, created_at"),
+        supabase.from("profiles").select("id, display_name, wallet_balance, referral_code, created_at"),
         supabase.from("orders").select("user_id, total, email").not("user_id", "is", null),
       ]);
       const orderMap = new Map<string, { count: number; total: number; email: string }>();
@@ -87,7 +87,7 @@ function AdminCustomers() {
                 <td className="px-3 py-3 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
                 <td className="px-3 py-3 text-right">{r.orderCount}</td>
                 <td className="px-3 py-3 text-right font-display">{formatINR(r.totalSpent)}</td>
-                <td className="px-3 py-3 text-right text-primary"><Award className="mr-1 inline h-3 w-3" />{r.loyalty_points}</td>
+                <td className="px-3 py-3 text-right text-primary"><Award className="mr-1 inline h-3 w-3" />{r.wallet_balance}</td>
               </tr>
             ))}
           </tbody>

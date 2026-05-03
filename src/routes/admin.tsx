@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LayoutDashboard, ShoppingCart, Package, Tag, Users, ShieldOff } from "lucide-react";
+import { Loader2, LayoutDashboard, ShoppingCart, Package, Tag, BoxSelect, ShieldOff } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Center — VendiMan" }, { name: "robots", content: "noindex" }] }),
@@ -14,8 +14,8 @@ const NAV = [
   { to: "/admin" as const, label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/admin/orders" as const, label: "Orders", icon: ShoppingCart },
   { to: "/admin/products" as const, label: "Products", icon: Package },
+  { to: "/admin/bundles" as const, label: "Bundles", icon: BoxSelect },
   { to: "/admin/coupons" as const, label: "Coupons", icon: Tag },
-  { to: "/admin/customers" as const, label: "Customers", icon: Users },
 ];
 
 function AdminLayout() {

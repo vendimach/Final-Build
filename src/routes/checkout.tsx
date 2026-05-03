@@ -179,6 +179,17 @@ function Checkout() {
       const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
       if (itemsErr) throw itemsErr;
 
+      // Credit wallet: 10% cashback if total > ₹799, and credit referrer on first order
+      if (user?.id) {
+        const [cashback] = await Promise.all([
+          supabase.rpc("credit_order_wallet", { p_order_id: order.id }),
+          supabase.rpc("process_first_order_referral", { p_order_id: order.id }),
+        ]);
+        if (cashback.data && Number(cashback.data) > 0) {
+          toast.success(`+${formatINR(Number(cashback.data))} cashback added to your wallet!`, { duration: 5000 });
+        }
+      }
+
       clear();
       toast.success(`Payment confirmed • Order ${order.order_number}`);
       navigate({ to: "/order-confirmed", search: { order: order.order_number } });

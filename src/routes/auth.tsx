@@ -52,6 +52,13 @@ function AuthPage() {
     }, 1000);
   }
 
+  async function processReferral() {
+    const code = localStorage.getItem("pending_referral_code");
+    if (!code) return;
+    localStorage.removeItem("pending_referral_code");
+    await supabase.rpc("process_referral_signup", { p_referrer_code: code });
+  }
+
   async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -72,6 +79,7 @@ function AuthPage() {
           navigate({ to: "/" });
           return;
         }
+        await processReferral();
         toast.success("Welcome to VendiMan!");
         navigate({ to: "/" });
       } else {
@@ -141,6 +149,7 @@ function AuthPage() {
         type: "sms",
       });
       if (error) throw error;
+      await processReferral();
       toast.success("Signed in successfully");
       navigate({ to: "/" });
     } catch (err) {

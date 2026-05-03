@@ -90,15 +90,17 @@ interface ReviewRow {
   quality_rating: number | null;
   texture_rating: number | null;
   value_rating: number | null;
+  delivery_rating: number | null;
 }
 
-type ReviewFilterKey = "taste" | "quality" | "texture" | "value";
+type ReviewFilterKey = "taste" | "quality" | "texture" | "value" | "delivery";
 
 const REVIEW_FILTERS: { key: ReviewFilterKey; label: string }[] = [
   { key: "taste", label: "Taste" },
   { key: "quality", label: "Quality" },
   { key: "texture", label: "Texture" },
-  { key: "value", label: "Value" },
+  { key: "value", label: "Value for Money" },
+  { key: "delivery", label: "Delivery Experience" },
 ];
 
 const FAQS: { q: string; a: string }[] = [
@@ -142,6 +144,11 @@ function PDP() {
   const [reviewPhotoUrls, setReviewPhotoUrls] = useState<string[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [activeFilters, setActiveFilters] = useState<ReviewFilterKey[]>([]);
+  const [tasteRating, setTasteRating] = useState<number | null>(null);
+  const [qualityRating, setQualityRating] = useState<number | null>(null);
+  const [textureRating, setTextureRating] = useState<number | null>(null);
+  const [valueRating, setValueRating] = useState<number | null>(null);
+  const [deliveryRating, setDeliveryRating] = useState<number | null>(null);
   const [notifyEmail, setNotifyEmail] = useState("");
   const [activeImage, setActiveImage] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -175,7 +182,7 @@ function PDP() {
     setLoadingReviews(true);
     supabase
       .from("reviews")
-      .select("id, rating, title, body, created_at, verified_buyer, photo_urls, taste_rating, quality_rating, texture_rating, value_rating")
+      .select("id, rating, title, body, created_at, verified_buyer, photo_urls, taste_rating, quality_rating, texture_rating, value_rating, delivery_rating")
       .eq("product_id", product.id)
       .eq("is_approved", true)
       .order("created_at", { ascending: false })
@@ -195,7 +202,7 @@ function PDP() {
         async () => {
           const { data } = await supabase
             .from("reviews")
-            .select("id, rating, title, body, created_at, verified_buyer, photo_urls, taste_rating, quality_rating, texture_rating, value_rating")
+            .select("id, rating, title, body, created_at, verified_buyer, photo_urls, taste_rating, quality_rating, texture_rating, value_rating, delivery_rating")
             .eq("product_id", product.id)
             .eq("is_approved", true)
             .order("created_at", { ascending: false })
@@ -227,23 +234,19 @@ function PDP() {
   const photoReviews = reviews.flatMap((r) => r.photo_urls ?? []).slice(0, 12);
 
   const filteredReviews = useMemo(() => {
-    if (activeFilters.length === 0) return reviews;
-    return reviews.filter((review) =>
+    const base = activeFilters.length === 0 ? reviews : reviews.filter((review) =>
       activeFilters.every((filter) => {
         switch (filter) {
-          case "taste":
-            return (review.taste_rating ?? review.rating) >= 4;
-          case "quality":
-            return (review.quality_rating ?? review.rating) >= 4;
-          case "texture":
-            return (review.texture_rating ?? review.rating) >= 4;
-          case "value":
-            return (review.value_rating ?? review.rating) >= 4;
-          default:
-            return true;
+          case "taste": return (review.taste_rating ?? review.rating) >= 4;
+          case "quality": return (review.quality_rating ?? review.rating) >= 4;
+          case "texture": return (review.texture_rating ?? review.rating) >= 4;
+          case "value": return (review.value_rating ?? review.rating) >= 4;
+          case "delivery": return (review.delivery_rating ?? review.rating) >= 4;
+          default: return true;
         }
       }),
     );
+    return [...base].sort((a, b) => b.rating - a.rating || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [activeFilters, reviews]);
 
   const filterCounts = useMemo(() => {
@@ -252,6 +255,7 @@ function PDP() {
       quality: reviews.filter((r) => (r.quality_rating ?? r.rating) >= 4).length,
       texture: reviews.filter((r) => (r.texture_rating ?? r.rating) >= 4).length,
       value: reviews.filter((r) => (r.value_rating ?? r.rating) >= 4).length,
+      delivery: reviews.filter((r) => (r.delivery_rating ?? r.rating) >= 4).length,
     } as Record<ReviewFilterKey, number>;
   }, [reviews]);
 
@@ -399,12 +403,18 @@ function PDP() {
           title: reviewTitle || null,
           body: reviewBody || null,
           photo_urls: reviewPhotoUrls,
+          taste_rating: tasteRating,
+          quality_rating: qualityRating,
+          texture_rating: textureRating,
+          value_rating: valueRating,
+          delivery_rating: deliveryRating,
         })
-        .select("id, rating, title, body, created_at, verified_buyer, photo_urls, taste_rating, quality_rating, texture_rating, value_rating")
+        .select("id, rating, title, body, created_at, verified_buyer, photo_urls, taste_rating, quality_rating, texture_rating, value_rating, delivery_rating")
         .single();
       if (error) throw error;
       setReviews((r) => [data as ReviewRow, ...r]);
       setReviewTitle(""); setReviewBody(""); setReviewRating(5); setReviewPhotoUrls([]);
+      setTasteRating(null); setQualityRating(null); setTextureRating(null); setValueRating(null); setDeliveryRating(null);
       toast.success("Thanks for your review!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not submit review");
@@ -438,6 +448,7 @@ function PDP() {
             quality_rating: r.quality_rating,
             texture_rating: r.texture_rating,
             value_rating: r.value_rating,
+            delivery_rating: r.delivery_rating,
           })),
         },
       });
@@ -777,13 +788,36 @@ function PDP() {
           {/* 1. Your rating form */}
           {user ? (
             <form onSubmit={submitReview} className="mt-6 rounded-2xl border border-border bg-card p-6">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Your rating</div>
+              <div className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Overall rating</div>
               <div className="flex gap-1">
                 {[1,2,3,4,5].map((n) => (
                   <button key={n} type="button" onClick={() => setReviewRating(n)} aria-label={`${n} star${n>1?"s":""}`}>
                     <Star className={`h-7 w-7 ${n <= reviewRating ? "fill-accent text-accent" : "text-muted"}`} />
                   </button>
                 ))}
+              </div>
+              <div className="mt-4 rounded-xl border border-border bg-background p-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Rate specific aspects (optional)</div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {([
+                    { label: "Taste", val: tasteRating, set: setTasteRating },
+                    { label: "Quality", val: qualityRating, set: setQualityRating },
+                    { label: "Texture", val: textureRating, set: setTextureRating },
+                    { label: "Value for Money", val: valueRating, set: setValueRating },
+                    { label: "Delivery", val: deliveryRating, set: setDeliveryRating },
+                  ] as const).map(({ label, val, set }) => (
+                    <div key={label} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground w-24 shrink-0">{label}</span>
+                      <div className="flex gap-0.5">
+                        {[1,2,3,4,5].map((n) => (
+                          <button key={n} type="button" onClick={() => set(val === n ? null : n)} aria-label={`${label} ${n} stars`}>
+                            <Star className={`h-4 w-4 ${val !== null && n <= val ? "fill-accent text-accent" : "text-muted"}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               <input value={reviewTitle} onChange={(e) => setReviewTitle(e.target.value)} placeholder="Headline (optional)" className="mt-4 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" />
               <textarea value={reviewBody} onChange={(e) => setReviewBody(e.target.value)} placeholder="Share your experience…" rows={3} className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" />
@@ -934,7 +968,7 @@ function PDP() {
                 )}
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
-                {REVIEW_FILTERS.map((filter) => {
+                {REVIEW_FILTERS.filter((f) => filterCounts[f.key] > 0).map((filter) => {
                   const checked = activeFilters.includes(filter.key);
                   return (
                     <label

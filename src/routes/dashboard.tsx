@@ -4,15 +4,16 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Package, Gift, Repeat, Copy, Check } from "lucide-react";
+import { Loader2, Package, Gift, Repeat, Copy, Check, Wallet, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/currency";
 
 interface Profile {
   display_name: string | null;
   referral_code: string;
-  loyalty_points: number;
+  wallet_balance: number;
 }
+
 interface OrderRow {
   id: string;
   order_number: string;
@@ -21,16 +22,32 @@ interface OrderRow {
   created_at: string;
 }
 
+interface WalletTxn {
+  id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  created_at: string;
+}
+
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — VendiMan" }, { name: "robots", content: "noindex" }] }),
   component: Dashboard,
 });
+
+const TXN_LABELS: Record<string, string> = {
+  order_cashback: "Order Cashback",
+  referral_credit: "Referral Bonus",
+  manual_credit: "Store Credit",
+  debit: "Redeemed",
+};
 
 function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [txns, setTxns] = useState<WalletTxn[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -41,16 +58,29 @@ function Dashboard() {
   useEffect(() => {
     if (!user) return;
     Promise.all([
-      supabase.from("profiles").select("display_name, referral_code, loyalty_points").eq("id", user.id).maybeSingle(),
-      supabase.from("orders").select("id, order_number, status, total, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
-    ])
-      .then(([p, o]) => {
-        if (p.data) setProfile(p.data as Profile);
-        if (o.data) setOrders(o.data as OrderRow[]);
-      })
-      .finally(() => setLoading(false));
+      supabase
+        .from("profiles")
+        .select("display_name, referral_code, wallet_balance")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("orders")
+        .select("id, order_number, status, total, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("wallet_transactions")
+        .select("id, amount, type, description, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]).then(([p, o, t]) => {
+      if (p.data) setProfile(p.data as Profile);
+      if (o.data) setOrders(o.data as OrderRow[]);
+      if (t.data) setTxns(t.data as WalletTxn[]);
+    }).finally(() => setLoading(false));
 
-    // Realtime: subscribe to status changes on this user's orders
     const channel = supabase
       .channel(`user-orders-${user.id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `user_id=eq.${user.id}` }, (payload) => {
@@ -58,7 +88,14 @@ function Dashboard() {
         setOrders((cur) => cur.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
         toast.info(`Order ${updated.order_number} → ${updated.status}`);
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "wallet_transactions", filter: `user_id=eq.${user.id}` }, (payload) => {
+        const newTxn = payload.new as WalletTxn;
+        setTxns((cur) => [newTxn, ...cur]);
+        setProfile((p) => p ? { ...p, wallet_balance: p.wallet_balance + newTxn.amount } : p);
+        if (newTxn.amount > 0) toast.success(`+${formatINR(newTxn.amount)} added to your wallet`);
+      })
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
@@ -86,19 +123,64 @@ function Dashboard() {
               {profile?.display_name || user?.email}
             </h1>
           </div>
-          <div className="rounded-2xl border border-border bg-card px-5 py-3 text-right">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Loyalty Points</div>
-            <div className="font-display text-3xl text-primary">{profile?.loyalty_points ?? 0}</div>
+          {/* Company Wallet Balance */}
+          <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-primary/5 px-5 py-4 text-right">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <Wallet className="h-3 w-3" /> Company Wallet
+            </div>
+            <div className="mt-1 font-display text-3xl text-primary">
+              {formatINR(profile?.wallet_balance ?? 0, { decimals: true })}
+            </div>
+            <div className="mt-0.5 text-[10px] text-muted-foreground">Available credits</div>
           </div>
         </div>
 
+        {/* Wallet Transaction History */}
+        <section className="mt-8 rounded-2xl border border-border bg-card p-6">
+          <h2 className="flex items-center gap-2 font-display text-2xl tracking-wide">
+            <Wallet className="h-5 w-5 text-primary" /> Wallet History
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Earn 10% cashback on orders above ₹799 · ₹100 bonus per successful referral
+          </p>
+          {txns.length === 0 ? (
+            <p className="mt-6 text-center text-sm text-muted-foreground">No transactions yet. Place an order above ₹799 to earn cashback!</p>
+          ) : (
+            <div className="mt-4 divide-y divide-border">
+              {txns.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full ${t.amount >= 0 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                      {t.amount >= 0
+                        ? <ArrowDownLeft className="h-4 w-4" />
+                        : <ArrowUpRight className="h-4 w-4" />}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold">{TXN_LABELS[t.type] ?? t.type}</div>
+                      {t.description && <div className="text-xs text-muted-foreground">{t.description}</div>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-display text-lg ${t.amount >= 0 ? "text-primary" : "text-destructive"}`}>
+                      {t.amount >= 0 ? "+" : ""}{formatINR(t.amount, { decimals: true })}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {new Date(t.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         {/* Referral */}
-        <section className="mt-8 rounded-2xl border border-border bg-gradient-to-br from-card to-primary/5 p-6">
+        <section className="mt-6 rounded-2xl border border-border bg-gradient-to-br from-card to-primary/5 p-6">
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-primary">
             <Gift className="h-4 w-4" /> Refer & Earn
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Share your link. Friends get 10% off — you get ₹100 in store credit per successful referral.
+            Share your link. Friends get 10% off their first order — you get <span className="font-semibold text-foreground">₹100 wallet credit</span> when they place their first order.
           </p>
           <div className="mt-4 flex gap-2">
             <input
@@ -122,7 +204,7 @@ function Dashboard() {
         </section>
 
         {/* Orders */}
-        <section className="mt-8">
+        <section className="mt-6">
           <h2 className="flex items-center gap-2 font-display text-2xl tracking-wide">
             <Package className="h-5 w-5 text-primary" /> Recent Orders
           </h2>
@@ -149,7 +231,7 @@ function Dashboard() {
                   {orders.map((o) => (
                     <tr key={o.id} className="border-t border-border">
                       <td className="px-4 py-3 font-mono text-xs">{o.order_number}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{new Date(o.created_at).toLocaleDateString("en-IN")}</td>
                       <td className="px-4 py-3">
                         <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                           {o.status}

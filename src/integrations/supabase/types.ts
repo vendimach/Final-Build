@@ -205,6 +205,7 @@ export type Database = {
           transaction_id: string | null
           updated_at: string
           user_id: string | null
+          wallet_credited: boolean
         }
         Insert: {
           carrier?: string | null
@@ -231,6 +232,7 @@ export type Database = {
           transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
+          wallet_credited?: boolean
         }
         Update: {
           carrier?: string | null
@@ -257,6 +259,7 @@ export type Database = {
           transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
+          wallet_credited?: boolean
         }
         Relationships: []
       }
@@ -335,7 +338,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
-          loyalty_points: number
+          wallet_balance: number
           phone: string | null
           referral_code: string
           referred_by: string | null
@@ -346,7 +349,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id: string
-          loyalty_points?: number
+          wallet_balance?: number
           phone?: string | null
           referral_code: string
           referred_by?: string | null
@@ -357,7 +360,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
-          loyalty_points?: number
+          wallet_balance?: number
           phone?: string | null
           referral_code?: string
           referred_by?: string | null
@@ -407,6 +410,7 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string
+          delivery_rating: number | null
           id: string
           is_approved: boolean
           photo_urls: string[]
@@ -424,6 +428,7 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          delivery_rating?: number | null
           id?: string
           is_approved?: boolean
           photo_urls?: string[]
@@ -441,6 +446,7 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          delivery_rating?: number | null
           id?: string
           is_approved?: boolean
           photo_urls?: string[]
@@ -544,6 +550,36 @@ export type Database = {
           },
         ]
       }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          reference_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -576,6 +612,18 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      credit_order_wallet: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
+      process_referral_signup: {
+        Args: { p_referrer_code: string }
+        Returns: undefined
+      }
+      process_first_order_referral: {
+        Args: { p_order_id: string }
+        Returns: undefined
       }
     }
     Enums: {
