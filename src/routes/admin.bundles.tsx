@@ -260,6 +260,7 @@ function AdminBundles() {
                     value={item.productId}
                     onChange={(e) => updateBundleItem(index, "productId", e.target.value)}
                     className="field flex-1"
+                    style={{ minWidth: 0 }}
                   >
                     <option value="">— Select product —</option>
                     {availableProducts.map((p) => (
@@ -269,20 +270,21 @@ function AdminBundles() {
                   <select
                     value={item.quantity}
                     onChange={(e) => updateBundleItem(index, "quantity", parseInt(e.target.value, 10))}
-                    className="field w-20"
+                    className="field-sm"
                   >
                     {[1,2,3,4,5,6,8,10,12].map((n) => (
                       <option key={n} value={n}>{n}</option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => removeBundleItemRow(index)}
-                    disabled={bundleItems.length === 1}
-                    className="rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-destructive disabled:opacity-30"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {bundleItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeBundleItemRow(index)}
+                      className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -291,7 +293,7 @@ function AdminBundles() {
               onClick={addBundleItemRow}
               className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:border-primary hover:text-primary"
             >
-              <Plus className="h-3 w-3" /> Add another product
+              <Plus className="h-3 w-3" /> Add product
             </button>
           </div>
 
@@ -398,6 +400,8 @@ function AdminBundles() {
         .label-text { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
         .field { width: 100%; border-radius: 0.75rem; border: 1px solid var(--border); background: var(--background); color: var(--foreground); padding: 0.625rem 0.75rem; font-size: 0.875rem; outline: none; }
         .field:focus { border-color: var(--primary); }
+        .field-sm { flex-shrink: 0; width: 4.5rem; border-radius: 0.75rem; border: 1px solid var(--border); background: var(--background); color: var(--foreground); padding: 0.625rem 0.25rem; font-size: 0.875rem; outline: none; text-align: center; }
+        .field-sm:focus { border-color: var(--primary); }
       `}</style>
     </div>
   );

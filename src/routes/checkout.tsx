@@ -71,6 +71,7 @@ function Checkout() {
   const [useWallet, setUseWallet] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddrId, setSelectedAddrId] = useState<string | null>(null);
+  const [saveAddress, setSaveAddress] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -260,6 +261,44 @@ function Checkout() {
           .eq("id", user.id);
       }
 
+      // Decrement stock for each purchased product
+      try {
+        for (const item of items) {
+          if (!item.productId || !UUID_RE.test(item.productId)) continue;
+          const { data: prod } = await supabase
+            .from("products")
+            .select("stock, description, format")
+            .eq("id", item.productId)
+            .single();
+          if (!prod) continue;
+          await supabase
+            .from("products")
+            .update({ stock: Math.max(0, (prod.stock as number) - item.quantity) })
+            .eq("id", item.productId);
+          // Pre-made bundles: also decrement constituent products
+          if (item.isBundle && (prod.format as string) === "bundles" && prod.description) {
+            for (const line of (prod.description as string).split("\n").filter(Boolean)) {
+              const m = line.match(/^(\d+)[×x]\s+(.+)$/);
+              if (!m) continue;
+              const qty = parseInt(m[1]) * item.quantity;
+              const { data: c } = await supabase.from("products").select("id, stock").eq("name", m[2].trim()).maybeSingle();
+              if (c) await supabase.from("products").update({ stock: Math.max(0, (c.stock as number) - qty) }).eq("id", c.id);
+            }
+          }
+        }
+      } catch {
+        // Non-critical — order is already placed
+      }
+
+      // Save manually entered address for future use
+      if (user?.id && saveAddress && selectedAddrId === null && recipient && street1 && city && postal) {
+        await supabase.from("addresses").insert({
+          user_id: user.id, label: null, recipient, street1,
+          street2: landmark || null, city, region,
+          postal_code: postal, phone: phone || null, is_default: savedAddresses.length === 0, country: "IN",
+        });
+      }
+
       clear();
       toast.success(`Payment confirmed • Order ${order.order_number}`);
       navigate({ to: "/order-confirmed", search: { order: order.order_number } });
@@ -369,6 +408,18 @@ function Checkout() {
               <div className="rounded-xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                 Country: <span className="font-semibold text-foreground">India 🇮🇳</span> (we currently ship within India only)
               </div>
+              {user && selectedAddrId === null && savedAddresses.length < 4 && (
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={saveAddress}
+                    onChange={(e) => setSaveAddress(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Save this address for future orders
+                </label>
+              )}
             </Section>
             <Section title="Payment">
               <div className="rounded-xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground">
