@@ -30,6 +30,13 @@ interface WalletTxn {
   created_at: string;
 }
 
+interface ReferralRow {
+  id: string;
+  status: string;
+  rewarded: boolean;
+  created_at: string;
+}
+
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — VendiMan" }, { name: "robots", content: "noindex" }] }),
   component: Dashboard,
@@ -48,6 +55,7 @@ function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [txns, setTxns] = useState<WalletTxn[]>([]);
+  const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -75,10 +83,16 @@ function Dashboard() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(20),
-    ]).then(([p, o, t]) => {
+      supabase
+        .from("referrals")
+        .select("id, status, rewarded, created_at")
+        .eq("referrer_id", user.id)
+        .order("created_at", { ascending: false }),
+    ]).then(([p, o, t, r]) => {
       if (p.data) setProfile(p.data as Profile);
       if (o.data) setOrders(o.data as OrderRow[]);
       if (t.data) setTxns(t.data as WalletTxn[]);
+      if (r.data) setReferrals(r.data as ReferralRow[]);
     }).finally(() => setLoading(false));
 
     const channel = supabase
@@ -180,8 +194,26 @@ function Dashboard() {
             <Gift className="h-4 w-4" /> Refer & Earn
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Share your link. Friends get 10% off their first order — you get <span className="font-semibold text-foreground">₹100 wallet credit</span> when they place their first order.
+            Share your link. When your friend signs up and their <span className="font-semibold text-foreground">first order is delivered</span>, you both get{" "}
+            <span className="font-semibold text-foreground">₹50 wallet credits</span> — one referral reward per user.
           </p>
+
+          {referrals.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-3 text-xs">
+              <span className="rounded-full border border-border bg-background px-3 py-1 font-semibold">
+                {referrals.length} invited
+              </span>
+              <span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-semibold text-primary">
+                {referrals.filter((r) => r.rewarded).length} rewarded
+              </span>
+              {referrals.filter((r) => !r.rewarded).length > 0 && (
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 font-semibold text-amber-600">
+                  {referrals.filter((r) => !r.rewarded).length} pending delivery
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="mt-4 flex gap-2">
             <input
               readOnly
@@ -201,6 +233,9 @@ function Dashboard() {
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Referral credits are issued automatically when the referred friend's first order is marked as delivered.
+          </p>
         </section>
 
         {/* Orders */}

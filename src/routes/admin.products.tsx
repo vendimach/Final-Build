@@ -256,7 +256,7 @@ function AdminProducts() {
         </div>
       )}
 
-      <style>{`.input { width: 100%; border: 1px solid hsl(var(--border, 0 0% 90%)); background: hsl(var(--background, 0 0% 100%)); padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; }`}</style>
+      <style>{`.input { width: 100%; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground)); padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; } .input:focus { outline: none; border-color: hsl(var(--primary)); }`}</style>
     </div>
   );
 }

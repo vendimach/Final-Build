@@ -50,8 +50,13 @@ function AdminOrders() {
 
   async function updateStatus(id: string, status: string) {
     const { error } = await supabase.from("orders").update({ status: status as OrderRow["status"] as never }).eq("id", id);
-    if (error) toast.error(error.message);
-    else toast.success("Status updated");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Status updated");
+    if (status === "delivered") {
+      // Credit referral bonus (₹50 each) and order cashback on delivery
+      await supabase.rpc("process_first_order_referral", { p_order_id: id });
+      await supabase.rpc("credit_order_wallet", { p_order_id: id });
+    }
   }
 
   async function saveTracking(id: string) {
@@ -110,7 +115,7 @@ function AdminOrders() {
                   <select
                     value={o.status}
                     onChange={(e) => updateStatus(o.id, e.target.value)}
-                    className="rounded-full border border-border bg-background px-2 py-1 text-[11px] font-bold uppercase tracking-wider"
+                    className="rounded-full border border-border bg-background text-foreground px-2 py-1 text-[11px] font-bold uppercase tracking-wider"
                   >
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>

@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
-import { Flame, Loader2, Eye, EyeOff, Mail, Smartphone, ArrowLeft } from "lucide-react";
+import { Flame, Loader2, Eye, EyeOff, Mail, Smartphone, ArrowLeft, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { validateIndianPhone } from "@/lib/currency";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -24,7 +24,12 @@ type Mode = "signin" | "signup";
 function AuthPage() {
   const navigate = useNavigate();
   const [channel, setChannel] = useState<Channel>("email");
-  const [mode, setMode] = useState<Mode>("signin");
+  const [pendingRef] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("pending_referral_code") : null,
+  );
+  const [mode, setMode] = useState<Mode>(() =>
+    typeof window !== "undefined" && localStorage.getItem("pending_referral_code") ? "signup" : "signin",
+  );
   const [loading, setLoading] = useState(false);
 
   // Email
@@ -200,6 +205,15 @@ function AuthPage() {
     <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main className="mx-auto flex max-w-md flex-col items-center px-6 py-16">
+        {pendingRef && (
+          <div className="mb-6 w-full rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-center text-sm">
+            <Gift className="mr-1 inline h-4 w-4 text-primary" />
+            You were invited by a friend!{" "}
+            <span className="font-semibold text-primary">
+              Sign up to unlock ₹50 welcome credits after your first order.
+            </span>
+          </div>
+        )}
         <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-ember shadow-ember">
           <Flame className="h-7 w-7 text-primary-foreground" />
         </div>

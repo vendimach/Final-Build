@@ -639,7 +639,7 @@ export type Database = {
         | "refunded"
       product_flavor: "spicy" | "sweet" | "savory"
       product_format: "sticks" | "bags" | "bundles"
-      subscription_frequency: "monthly" | "bimonthly"
+      subscription_frequency: "biweekly" | "monthly" | "six_weekly" | "bimonthly" | "quarterly"
       subscription_status: "active" | "paused" | "cancelled"
     }
     CompositeTypes: {
@@ -781,7 +781,7 @@ export const Constants = {
       ],
       product_flavor: ["spicy", "sweet", "savory"],
       product_format: ["sticks", "bags", "bundles"],
-      subscription_frequency: ["monthly", "bimonthly"],
+      subscription_frequency: ["biweekly", "monthly", "six_weekly", "bimonthly", "quarterly"],
       subscription_status: ["active", "paused", "cancelled"],
     },
   },

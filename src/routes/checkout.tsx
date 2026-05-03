@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Lock, Loader2, ShoppingBag, Tag, Check, ShieldCheck } from "lucide-react";
+import { Lock, Loader2, ShoppingBag, Tag, Check, ShieldCheck, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { RazorpayCheckout } from "@/components/RazorpayCheckout";
 import {
@@ -54,9 +54,24 @@ function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [useWallet, setUseWallet] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("wallet_balance")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setWalletBalance(Number(data.wallet_balance) || 0); });
+  }, [user]);
+
   const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING_FEE;
   const discount = coupon?.applied ?? 0;
-  const total = Math.max(0, subtotal + shipping - discount);
+  const preWalletTotal = Math.max(0, subtotal + shipping - discount);
+  const walletApplied = useWallet ? Math.min(walletBalance, preWalletTotal) : 0;
+  const total = Math.max(0, preWalletTotal - walletApplied);
 
   async function applyCoupon() {
     if (!couponInput.trim()) return;
@@ -121,6 +136,10 @@ function Checkout() {
       toast.error("Enter a valid 6-digit PIN code");
       return;
     }
+    if (total === 0) {
+      void placeOrder({ method: "wallet", txnId: `wallet_${Date.now()}` });
+      return;
+    }
     setPayOpen(true);
   }
 
@@ -179,9 +198,19 @@ function Checkout() {
       const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
       if (itemsErr) throw itemsErr;
 
-      // Credit referrer on user's first order; cashback is credited on delivery via DB trigger
-      if (user?.id) {
-        await supabase.rpc("process_first_order_referral", { p_order_id: order.id });
+      // Debit wallet credits if used
+      if (user?.id && walletApplied > 0) {
+        await supabase.from("wallet_transactions").insert({
+          user_id: user.id,
+          amount: -walletApplied,
+          type: "debit",
+          description: `Redeemed for order ${order.order_number}`,
+          reference_id: order.id,
+        });
+        await supabase
+          .from("profiles")
+          .update({ wallet_balance: walletBalance - walletApplied })
+          .eq("id", user.id);
       }
 
       clear();
@@ -321,9 +350,34 @@ function Checkout() {
               )}
             </div>
 
+            {/* Wallet credits */}
+            {user && walletBalance > 0 && (
+              <div className="border-t border-border pt-4">
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={useWallet}
+                    onChange={(e) => setUseWallet(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <span className="flex-1">
+                    Use wallet credits
+                    <span className="ml-1 text-xs text-muted-foreground">({formatINR(walletBalance)} available)</span>
+                  </span>
+                </label>
+                {useWallet && walletApplied > 0 && (
+                  <p className="mt-1 pl-6 text-xs font-semibold text-primary">
+                    −{formatINR(walletApplied)} will be applied
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1.5 border-t border-border pt-4 text-sm">
               <Row label="Subtotal" value={formatINR(subtotal)} />
               {discount > 0 && <Row label="Discount" value={`-${formatINR(discount)}`} accent />}
+              {walletApplied > 0 && <Row label="Wallet credits" value={`-${formatINR(walletApplied)}`} accent />}
               <Row label="Shipping" value={shipping === 0 ? "FREE" : formatINR(shipping)} />
               {shipping > 0 && (
                 <p className="text-[10px] text-muted-foreground">

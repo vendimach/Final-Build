@@ -396,7 +396,7 @@ function AdminBundles() {
 
       <style>{`
         .label-text { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: hsl(var(--muted-foreground)); }
-        .field { width: 100%; border-radius: 0.75rem; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); padding: 0.625rem 0.75rem; font-size: 0.875rem; outline: none; }
+        .field { width: 100%; border-radius: 0.75rem; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground)); padding: 0.625rem 0.75rem; font-size: 0.875rem; outline: none; }
         .field:focus { border-color: hsl(var(--primary)); }
       `}</style>
     </div>

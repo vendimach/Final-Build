@@ -20,6 +20,8 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [productList, setProductList] = useState<Product[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!user) {
@@ -48,9 +50,22 @@ export function Header() {
 
   useEffect(() => {
     if (searchOpen) {
-      // small delay to allow render
       requestAnimationFrame(() => searchInputRef.current?.focus());
     }
+  }, [searchOpen]);
+
+  // Close search when clicking anywhere outside the panel or toggle button
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        searchPanelRef.current?.contains(e.target as Node) ||
+        searchToggleRef.current?.contains(e.target as Node)
+      ) return;
+      setSearchOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [searchOpen]);
 
   const suggestions = useMemo(() => {
@@ -98,6 +113,7 @@ export function Header() {
 
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
+            ref={searchToggleRef}
             aria-label="Search products"
             onClick={() => setSearchOpen((v) => !v)}
             className="btn-glow inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card"
@@ -173,7 +189,7 @@ export function Header() {
             className="fixed inset-0 top-16 z-30 bg-black/40 backdrop-blur-sm"
             onClick={() => setSearchOpen(false)}
           />
-          <div className="absolute inset-x-0 top-16 z-40 border-b border-border bg-background shadow-lg">
+          <div ref={searchPanelRef} className="absolute inset-x-0 top-16 z-40 border-b border-border bg-background shadow-lg">
             <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
               <form onSubmit={submitProductSearch} className="flex items-center gap-3 rounded-full border border-border bg-card px-4">
                 <Search className="h-4 w-4 text-muted-foreground" />

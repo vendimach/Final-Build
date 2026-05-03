@@ -22,8 +22,16 @@ export const Route = createFileRoute("/subscribe")({
   component: SubscribePage,
 });
 
-type Frequency = "monthly" | "bimonthly";
+type Frequency = "biweekly" | "monthly" | "six_weekly" | "bimonthly" | "quarterly";
 const SUBSCRIBE_DISCOUNT = 0.1; // 10% off
+
+const FREQ_CONFIG: Record<Frequency, { label: string; short: string; desc: string; days: number }> = {
+  biweekly:   { label: "Every 2 weeks",  short: "2-weekly",    desc: "Perfect for daily snackers",    days: 14 },
+  monthly:    { label: "Every month",    short: "Monthly",     desc: "Our most popular cadence",       days: 30 },
+  six_weekly: { label: "Every 6 weeks",  short: "6-weekly",    desc: "A little extra stretch",         days: 42 },
+  bimonthly:  { label: "Every 2 months", short: "Bi-monthly",  desc: "Great for occasional cravings",  days: 60 },
+  quarterly:  { label: "Every 3 months", short: "Quarterly",   desc: "The quarterly stockpile",        days: 90 },
+};
 
 interface SubRow {
   id: string;
@@ -71,7 +79,7 @@ function SubscribePage() {
 
   function nextShipDate(freq: Frequency): string {
     const d = new Date();
-    d.setDate(d.getDate() + (freq === "monthly" ? 30 : 60));
+    d.setDate(d.getDate() + FREQ_CONFIG[freq].days);
     return d.toISOString();
   }
 
@@ -137,8 +145,7 @@ function SubscribePage() {
             Never run out. Save 10% on every box.
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-            Pick your favourite snack, choose monthly or bi-monthly delivery, and we'll ship it to your door
-            automatically. Pause, skip, or cancel anytime — no commitments.
+            Pick your favourite snack, choose your delivery cadence (every 2 weeks, monthly, 6 weeks, bi-monthly, or quarterly), and we'll ship it automatically. Pause, skip, or cancel anytime — no commitments.
           </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <Perk icon={<Tag className="h-5 w-5" />} title="10% off every order" desc="Locked-in subscriber price" />
@@ -169,21 +176,17 @@ function SubscribePage() {
 
             <div>
               <h2 className="font-display text-2xl tracking-wide">2. Pick a frequency</h2>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <FrequencyCard
-                  value="monthly"
-                  label="Every month"
-                  desc="Best for daily snackers"
-                  selected={frequency === "monthly"}
-                  onSelect={() => setFrequency("monthly")}
-                />
-                <FrequencyCard
-                  value="bimonthly"
-                  label="Every 2 months"
-                  desc="Great for occasional cravings"
-                  selected={frequency === "bimonthly"}
-                  onSelect={() => setFrequency("bimonthly")}
-                />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {(Object.entries(FREQ_CONFIG) as [Frequency, typeof FREQ_CONFIG[Frequency]][]).map(([value, cfg]) => (
+                  <FrequencyCard
+                    key={value}
+                    value={value}
+                    label={cfg.label}
+                    desc={cfg.desc}
+                    selected={frequency === value}
+                    onSelect={() => setFrequency(value)}
+                  />
+                ))}
               </div>
             </div>
 
@@ -226,7 +229,7 @@ function SubscribePage() {
                   <div className="flex-1">
                     <div className="font-semibold leading-tight">{selected.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {frequency === "monthly" ? "Every month" : "Every 2 months"} · Qty {quantity}
+                      {FREQ_CONFIG[frequency].label} · Qty {quantity}
                     </div>
                   </div>
                 </div>
@@ -286,7 +289,7 @@ function SubscribePage() {
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
                               <Repeat className="h-3 w-3" />
-                              {s.frequency === "monthly" ? "Monthly" : "Bi-monthly"} · Qty {s.quantity}
+                              {FREQ_CONFIG[s.frequency]?.short ?? s.frequency} · Qty {s.quantity}
                             </span>
                             {s.next_ship_at && (
                               <span className="inline-flex items-center gap-1">
