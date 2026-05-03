@@ -19,6 +19,7 @@ interface TrackedOrder {
 export const Route = createFileRoute("/track")({
   validateSearch: (search: Record<string, unknown>) => ({
     order: typeof search.order === "string" ? search.order : "",
+    email: typeof search.email === "string" ? search.email : "",
   }),
   head: () => ({
     meta: [
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/track")({
 function TrackPage() {
   const search = Route.useSearch();
   const [orderId, setOrderId] = useState(search.order ?? "");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(search.email ?? "");
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<TrackedOrder | null>(null);
 
@@ -65,7 +66,7 @@ function TrackPage() {
   }
 
   useEffect(() => {
-    if (search.order && email) lookup();
+    if (search.order && search.email) lookup();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

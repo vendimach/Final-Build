@@ -92,6 +92,8 @@
 }
 
 .dark {
+  color-scheme: dark; /* forces native selects/inputs to render in dark mode */
+
   /* Dark mode — charcoal & ember */
   --background: oklch(0.13 0.01 40);
   --foreground: oklch(0.96 0.01 80);

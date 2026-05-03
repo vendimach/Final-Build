@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Lock, Loader2, ShoppingBag, Tag, Check, ShieldCheck, Wallet } from "lucide-react";
+import { Lock, Loader2, ShoppingBag, Tag, Check, ShieldCheck, Wallet, MapPin, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { RazorpayCheckout } from "@/components/RazorpayCheckout";
 import {
@@ -34,6 +34,19 @@ interface CouponState {
   applied: number;
 }
 
+interface SavedAddress {
+  id: string;
+  label: string | null;
+  recipient: string;
+  street1: string;
+  street2: string | null;
+  city: string;
+  region: string | null;
+  postal_code: string;
+  phone: string | null;
+  is_default: boolean;
+}
+
 function Checkout() {
   const { items, subtotal, clear } = useCart();
   const { user } = useAuth();
@@ -56,6 +69,8 @@ function Checkout() {
 
   const [walletBalance, setWalletBalance] = useState(0);
   const [useWallet, setUseWallet] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddrId, setSelectedAddrId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -65,7 +80,39 @@ function Checkout() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => { if (data) setWalletBalance(Number(data.wallet_balance) || 0); });
+    supabase
+      .from("addresses")
+      .select("id, label, recipient, street1, street2, city, region, postal_code, phone, is_default")
+      .eq("user_id", user.id)
+      .order("is_default", { ascending: false })
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const addrs = data as SavedAddress[];
+        setSavedAddresses(addrs);
+        const def = addrs.find((a) => a.is_default) ?? addrs[0];
+        if (def) {
+          applyAddress(def);
+          setSelectedAddrId(def.id);
+        }
+      });
   }, [user]);
+
+  function applyAddress(addr: SavedAddress) {
+    setRecipient(addr.recipient);
+    setStreet1(addr.street1);
+    setLandmark(addr.street2 ?? "");
+    setCity(addr.city);
+    setRegion(addr.region ?? "Maharashtra");
+    setPostal(addr.postal_code);
+    if (addr.phone) setPhone(addr.phone);
+  }
+
+  async function deleteSavedAddr(id: string) {
+    const { error } = await supabase.from("addresses").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    setSavedAddresses((prev) => prev.filter((a) => a.id !== id));
+    if (selectedAddrId === id) setSelectedAddrId(null);
+  }
 
   const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING_FEE;
   const discount = coupon?.applied ?? 0;
@@ -251,6 +298,55 @@ function Checkout() {
               <Input label="Email" type="email" value={email} onChange={setEmail} required />
               <Input label="Mobile (+91)" value={phone} onChange={setPhone} required placeholder="10-digit mobile number" />
             </Section>
+            {savedAddresses.length > 0 && (
+              <Section title="Saved addresses">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {savedAddresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      onClick={() => { applyAddress(addr); setSelectedAddrId(addr.id); }}
+                      className={`group relative cursor-pointer rounded-xl border p-3 transition-colors ${
+                        selectedAddrId === addr.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-background hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          {addr.label && <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">{addr.label}</div>}
+                          <div className="truncate text-sm font-semibold">{addr.recipient}</div>
+                          <div className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                            {addr.street1}{addr.street2 ? `, ${addr.street2}` : ""}, {addr.city}, {addr.postal_code}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {addr.is_default && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-primary">Default</span>}
+                          {selectedAddrId === addr.id && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void deleteSavedAddr(addr.id); }}
+                        className="absolute bottom-2 right-2 hidden rounded-full p-1 text-destructive hover:bg-destructive/10 group-hover:flex"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <div
+                    onClick={() => { setSelectedAddrId(null); setRecipient(""); setStreet1(""); setLandmark(""); setCity(""); setPostal(""); }}
+                    className={`cursor-pointer rounded-xl border p-3 text-center transition-colors ${
+                      selectedAddrId === null
+                        ? "border-primary bg-primary/5"
+                        : "border-dashed border-border bg-background text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <MapPin className="mx-auto h-4 w-4 mb-1" />
+                    <div className="text-xs font-semibold">Enter manually</div>
+                  </div>
+                </div>
+              </Section>
+            )}
             <Section title="Shipping address">
               <Input label="Full name" value={recipient} onChange={setRecipient} required />
               <Input label="House no., Building, Street" value={street1} onChange={setStreet1} required />
