@@ -3,7 +3,6 @@ import { useState, type FormEvent } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Flame, Loader2, Eye, EyeOff, Mail, Smartphone, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { validateIndianPhone } from "@/lib/currency";
@@ -174,16 +173,16 @@ function AuthPage() {
   async function handleGoogle() {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
       });
-      if (result.error) {
-        toast.error("Google sign-in failed");
-        return;
-      }
-      if (result.redirected) return;
-      navigate({ to: "/" });
-    } finally {
+      if (error) throw error;
+      // On success the browser redirects to Google — no need to reset loading
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Google sign-in failed");
       setLoading(false);
     }
   }
