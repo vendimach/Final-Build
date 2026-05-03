@@ -6,8 +6,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
-import { createRazorpayOrder, verifyRazorpayPayment } from "@/server/razorpay";
 import { formatINR } from "@/lib/currency";
+
+async function callFn<T>(path: string, data: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as { error?: string }).error ?? `Request failed (${res.status})`);
+  return json as T;
+}
 
 interface Props {
   open: boolean;
@@ -72,7 +82,10 @@ export function RazorpayCheckout({ open, amount, prefill, receipt, onClose, onSu
         const ok = await loadRazorpay();
         if (!ok) throw new Error("Could not load Razorpay. Check your internet connection.");
 
-        const order = await createRazorpayOrder({ data: { amount, receipt } });
+        const order = await callFn<{ orderId: string; amount: number; currency: string; keyId: string }>(
+          "/.netlify/functions/create-razorpay-order",
+          { amount, receipt },
+        );
 
         setStage("popup");
         const rzp = new window.Razorpay!({
@@ -103,13 +116,14 @@ export function RazorpayCheckout({ open, amount, prefill, receipt, onClose, onSu
             };
             try {
               setStage("verifying");
-              const verify = await verifyRazorpayPayment({
-                data: {
+              const verify = await callFn<{ valid: boolean }>(
+                "/.netlify/functions/verify-razorpay-payment",
+                {
                   razorpay_order_id: r.razorpay_order_id,
                   razorpay_payment_id: r.razorpay_payment_id,
                   razorpay_signature: r.razorpay_signature,
                 },
-              });
+              );
               if (!verify.valid) {
                 toast.error("Payment signature verification failed");
                 onClose();
