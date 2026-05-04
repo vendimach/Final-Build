@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, User, Save, Mail, Key } from "lucide-react";
+import { Loader2, User, Save, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/profile")({
@@ -12,24 +12,18 @@ export const Route = createFileRoute("/dashboard/profile")({
 function DashboardProfile() {
   const { user, signOut } = useAuth();
   const [displayName, setDisplayName] = useState("");
-  const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [pwEmail, setPwEmail] = useState(user?.email ?? "");
-  const [sendingReset, setSendingReset] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("display_name, referral_code")
+      .select("display_name")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
-          setDisplayName(data.display_name ?? "");
-          setReferralCode(data.referral_code ?? "");
-        }
+        if (data) setDisplayName(data.display_name ?? "");
         setLoading(false);
       });
   }, [user]);
@@ -51,28 +45,12 @@ function DashboardProfile() {
     }
   }
 
-  async function sendPasswordReset() {
-    if (!pwEmail) return;
-    setSendingReset(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(pwEmail, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
-      if (error) throw error;
-      toast.success("Password reset email sent");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send reset email");
-    } finally {
-      setSendingReset(false);
-    }
-  }
-
   if (loading) {
     return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="space-y-6">
       {/* Profile info */}
       <section className="rounded-2xl border border-border bg-card p-6">
         <h2 className="mb-4 flex items-center gap-2 font-display text-2xl tracking-wide">
@@ -97,14 +75,6 @@ function DashboardProfile() {
             </div>
           </Field>
 
-          {referralCode && (
-            <Field label="Referral code">
-              <div className="rounded-xl border border-border bg-muted px-3 py-2.5 font-mono text-sm">
-                {referralCode}
-              </div>
-            </Field>
-          )}
-
           <button
             onClick={saveProfile}
             disabled={saving}
@@ -112,31 +82,6 @@ function DashboardProfile() {
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save Changes
-          </button>
-        </div>
-      </section>
-
-      {/* Password reset */}
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-1 flex items-center gap-2 font-display text-xl tracking-wide">
-          <Key className="h-4 w-4 text-primary" /> Change Password
-        </h2>
-        <p className="mb-4 text-xs text-muted-foreground">We'll send a password reset link to your email.</p>
-        <div className="flex gap-2">
-          <input
-            type="email"
-            value={pwEmail}
-            onChange={(e) => setPwEmail(e.target.value)}
-            placeholder="Your email"
-            className="prof-input flex-1"
-          />
-          <button
-            onClick={sendPasswordReset}
-            disabled={sendingReset}
-            className="btn-glow inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50"
-          >
-            {sendingReset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Key className="h-3 w-3" />}
-            Send Reset
           </button>
         </div>
       </section>

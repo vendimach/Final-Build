@@ -15,6 +15,7 @@ interface Metrics {
   aov: number;
   csatAvg: number;
   csatCount: number;
+  csatDist: Record<number, number>;
   activeSubs: number;
   lowStockCount: number;
   conversionRate: number;
@@ -46,6 +47,8 @@ function AdminOverview() {
 
       const csatOrders = orders.filter((o) => o.csat_score);
       const csatAvg = csatOrders.length ? csatOrders.reduce((s, o) => s + Number(o.csat_score), 0) / csatOrders.length : 0;
+      const csatDist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      csatOrders.forEach((o) => { const s = Math.round(Number(o.csat_score)); if (s >= 1 && s <= 5) csatDist[s]++; });
 
       // Top products
       const orderIds = new Set(orders.map((o) => o.id));
@@ -85,6 +88,7 @@ function AdminOverview() {
         aov,
         csatAvg,
         csatCount: csatOrders.length,
+        csatDist,
         activeSubs: subsRes.count ?? 0,
         lowStockCount,
         conversionRate,
@@ -145,6 +149,77 @@ function AdminOverview() {
               <span className="text-[9px] text-muted-foreground">{d.day.slice(5)}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* CSAT breakdown */}
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl">
+            <Star className="h-5 w-5 text-primary" /> CSAT Breakdown
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {m.csatCount} ratings · avg {m.csatAvg ? m.csatAvg.toFixed(1) : "—"} / 5
+          </p>
+          {m.csatCount === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">No ratings yet.</p>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {[5, 4, 3, 2, 1].map((star) => {
+                const count = m.csatDist[star] ?? 0;
+                const pct = m.csatCount ? (count / m.csatCount) * 100 : 0;
+                return (
+                  <div key={star} className="flex items-center gap-3">
+                    <span className="w-4 text-right text-xs font-bold text-muted-foreground">{star}</span>
+                    <Star className="h-3 w-3 shrink-0 text-amber-400" />
+                    <div className="flex-1 overflow-hidden rounded-full bg-muted h-2">
+                      <div
+                        className="h-full rounded-full bg-gradient-ember transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-right text-xs text-muted-foreground">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Conversion Rate */}
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl">
+            <TrendingUp className="h-5 w-5 text-primary" /> Conversion Rate
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">Newsletter signups → orders (30 days)</p>
+          <div className="mt-6 flex items-center gap-6">
+            <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+              <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" strokeWidth="3" />
+                <circle
+                  cx="18" cy="18" r="15.9"
+                  fill="none"
+                  strokeWidth="3"
+                  strokeDasharray={`${Math.min(m.conversionRate, 100)} 100`}
+                  strokeLinecap="round"
+                  style={{ stroke: "var(--primary)" }}
+                />
+              </svg>
+              <div className="absolute text-center">
+                <div className="font-display text-xl leading-none">{m.conversionRate.toFixed(1)}%</div>
+              </div>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Orders</div>
+                <div className="font-display text-2xl">{m.orderCount}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Signups (proxy)</div>
+                <div className="font-display text-2xl">{m.conversionRate > 0 ? Math.round(m.orderCount / (m.conversionRate / 100)) : "—"}</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

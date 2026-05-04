@@ -438,8 +438,10 @@ function PDP() {
     if (reviews.length === 0) return;
     setLoadingSummary(true);
     try {
-      const { data, error } = await supabase.functions.invoke("summarize-reviews", {
-        body: {
+      const res = await fetch("/.netlify/functions/summarize-reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           productName: product.name,
           reviews: reviews.map((r) => ({
             rating: r.rating,
@@ -451,11 +453,12 @@ function PDP() {
             value_rating: r.value_rating,
             delivery_rating: r.delivery_rating,
           })),
-        },
+        }),
       });
-      if (error) throw error;
-      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-      setAiSummary((data as { summary?: string })?.summary ?? "Couldn't generate a summary.");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as { summary?: string; error?: string };
+      if (data.error) throw new Error(data.error);
+      setAiSummary(data.summary ?? "Couldn't generate a summary.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not generate summary");
     } finally {
@@ -973,14 +976,15 @@ function PDP() {
                 {REVIEW_FILTERS.filter((f) => filterCounts[f.key] > 0).map((filter) => {
                   const checked = activeFilters.includes(filter.key);
                   return (
-                    <label
+                    <div
                       key={filter.key}
+                      onClick={() => toggleReviewFilter(filter.key)}
                       className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${checked ? "border-primary bg-primary/5" : "border-border bg-background"}`}
                     >
-                      <Checkbox checked={checked} onCheckedChange={() => toggleReviewFilter(filter.key)} />
+                      <Checkbox checked={checked} />
                       <span className="text-sm font-medium">{filter.label}</span>
                       <Badge variant="secondary" className="ml-1">{filterCounts[filter.key]}</Badge>
-                    </label>
+                    </div>
                   );
                 })}
               </div>

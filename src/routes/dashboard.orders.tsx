@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Package, Repeat } from "lucide-react";
+import { Loader2, Package, Repeat, Star } from "lucide-react";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/currency";
 
@@ -18,6 +18,7 @@ interface OrderRow {
   total: number;
   created_at: string;
   email: string;
+  csat_score: number | null;
 }
 
 const STATUS_FILTERS = ["all", "pending", "paid", "processing", "shipped", "delivered", "cancelled"];
@@ -38,12 +39,14 @@ function DashboardOrders() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [reordering, setReordering] = useState<string | null>(null);
+  const [ratingOrder, setRatingOrder] = useState<string | null>(null);
+  const [hoverStar, setHoverStar] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("orders")
-      .select("id, order_number, status, total, created_at, email")
+      .select("id, order_number, status, total, created_at, email, csat_score")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => { setOrders((data ?? []) as OrderRow[]); setLoading(false); });
@@ -58,6 +61,14 @@ function DashboardOrders() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user]);
+
+  async function submitCsat(orderId: string, score: number) {
+    const { error } = await supabase.from("orders").update({ csat_score: score }).eq("id", orderId);
+    if (error) { toast.error(error.message); return; }
+    setOrders((cur) => cur.map((o) => o.id === orderId ? { ...o, csat_score: score } : o));
+    setRatingOrder(null);
+    toast.success("Thanks for your feedback!");
+  }
 
   async function reorder(orderId: string) {
     setReordering(orderId);
@@ -188,6 +199,36 @@ function DashboardOrders() {
                             {reordering === o.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Repeat className="h-3 w-3" />}
                             Reorder
                           </button>
+                        )}
+                        {isDelivered && !o.csat_score && ratingOrder !== o.id && (
+                          <button
+                            onClick={() => setRatingOrder(o.id)}
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-600"
+                          >
+                            <Star className="h-3 w-3" /> Rate
+                          </button>
+                        )}
+                        {ratingOrder === o.id && (
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <button
+                                key={s}
+                                onClick={() => submitCsat(o.id, s)}
+                                onMouseEnter={() => setHoverStar(s)}
+                                onMouseLeave={() => setHoverStar(0)}
+                                className="p-0.5"
+                              >
+                                <Star className={`h-4 w-4 transition-colors ${s <= (hoverStar || 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {isDelivered && o.csat_score && (
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star key={s} className={`h-3 w-3 ${s <= o.csat_score! ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} />
+                            ))}
+                          </div>
                         )}
                       </div>
                     </td>
